@@ -1,0 +1,176 @@
+# (c) 2020 Amazon Web Services, Inc. or its affiliates. All Rights Reserved. This AWS Content
+# is provided subject to the terms of the AWS Customer Agreement available at
+# https://aws.amazon.com/agreement/ or other written agreement between Customer
+# and Amazon Web Services, Inc.
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "AWS CloudFormation template to set up Auto-rotation function for AWS IAM Access Keys."
+
+############################################################################
+# Parameters                                                               #
+############################################################################
+
+Parameters:
+
+  pLambdaFunctionS3BucketName:
+    Type: String
+    Default: ''
+    Description: Name of the S3 Bucket that houses your Lambda function code.
+
+#IAM Key Rotation
+  pRotationLambdaFunctionZipFile:
+    Type: String
+    Default: AccessKeyRotationLambdaFunction.zip
+    Description: The zip file for your rotation Lambda Function.
+
+############################################################################
+# Parameter groups and labels                                              #
+############################################################################
+
+Metadata:
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: S3 Bucket
+        Parameters:
+          - pLambdaFunctionS3BucketName
+      - Label:
+          default: IAM Key Rotation Lambda Function
+        Parameters:
+          - pRotationLambdaFunctionZipFile
+
+    ParameterLabels:
+      pLambdaFunctionS3BucketName:
+        default: S3 Bucket Name
+
+      #Auto Rotation IAM Function
+      pRotationLambdaFunctionZipFile:
+        default: Lambda Zip File
+
+#############################################################################
+# Resources                                                                #
+############################################################################
+Resources:
+
+#IAM Key Rotation
+  rRotationLambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowExecutionPermissionsOnFunction
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+      Policies:
+        - PolicyName: AllowRotationFunctionPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${pLambdaFunctionS3BucketName}/*'
+              - Effect: Allow
+                Action:
+                  - iam:List*
+                  - iam:CreatePolicy
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - iam:AttachUserPolicy
+                Resource: "arn:aws:iam::${AWS::AccountId}:user/*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:PutResourcePolicy
+                Resource: "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*"
+
+  rRotationAccessKeyRotateLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Rotates IAM Access Keys on specified schedule
+      FunctionName: IAM-Access-Key-Rotation-LambdaFunctionName
+      Handler: AccessKeyRotationLambdaFunction.lambda_handler
+      Runtime: python3.7
+      Role: !GetAtt 'rRotationLambdaFunctionExecutionRole.Arn'
+      Timeout: 240
+      Environment:
+        Variables:
+          RotationPeriod: 90
+          InactivePeriod: 100
+          RetentionPeriod: 110
+          sns_arn: !Ref rRotationSNSTopic
+      Code:
+        S3Bucket: !Ref pLambdaFunctionS3BucketName
+        S3Key: !Ref pRotationLambdaFunctionZipFile
+
+  rRotationCloudWatchEventLambdaTrigger:
+    DependsOn:
+      - rRotationAccessKeyRotateLambdaFunction
+      - rRotationLambdaFunctionExecutionRole
+    Type: AWS::Events::Rule
+    Properties:
+      Description: CloudWatch Event to trigger Access Key auto-rotation Lambda Function daily
+      ScheduleExpression: rate(24 hours)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt rRotationAccessKeyRotateLambdaFunction.Arn
+          Id: AccessKeyRotationFunction
+
+  rRotationCloudWatchEventsLambdaPermissions:
+    DependsOn: rRotationAccessKeyRotateLambdaFunction
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: IAM-Access-Key-Rotation-LambdaFunctionName
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt rRotationAccessKeyRotateLambdaFunction.Arn
+
+  rRotationCloudWatchEventTopicPolicy:
+    DependsOn: rRotationSNSTopic
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sns:Publish
+            Resource: "*"
+      Topics:
+        - !Ref rRotationSNSTopic
+
+  rRotationSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: SNSNotificationForNewAccessKeyCreation
+      Subscription:
+        - Endpoint: !Ref PLACEHOLDERFORLAMBDAFUNCTION  <--------------------------- UPDATE ME
+          Protocol: lambda
+
+############################################################################
+# Outputs                                                                  #
+############################################################################
+
+Outputs:
+
+  oRotationLambdaFunctionExecutionRole:
+    Value: !GetAtt rRotationLambdaFunctionExecutionRole.Arn
+
+  oRotationLambdaFunctionName:
+    Value: !GetAtt rRotationAccessKeyRotateLambdaFunction.Arn
+
+  oRotationCloudWatchEventLambdaTrigger:
+    Value: !GetAtt rRotationCloudWatchEventLambdaTrigger.Arn
+
+  oRotationSNSTopic:
+    Value: !Ref rRotationSNSTopic
