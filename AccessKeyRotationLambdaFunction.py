@@ -2,7 +2,7 @@ import botocore
 import boto3
 import datetime
 import os
-
+from botocore.exceptions import ClientError
 # Inputs from Environment Variables
 
 # Global Variables
@@ -23,9 +23,12 @@ oldKeyInactivationPeriod = int(os.environ['InactivePeriod'])
 oldKeyDeletionPeriod = int(os.environ['RetentionPeriod'])
 
 # Pre-calculate the rotation and retention cutoff dates
-rotationDate = (datetime.datetime.now() - datetime.timedelta(days=rotationPeriod)).date()
-inactivationDate = (datetime.datetime.now() - datetime.timedelta(days=oldKeyInactivationPeriod)).date()
-deletionDate = (datetime.datetime.now() - datetime.timedelta(days=oldKeyDeletionPeriod)).date()
+rotationDate = (datetime.datetime.now() -
+                datetime.timedelta(days=rotationPeriod)).date()
+inactivationDate = (datetime.datetime.now() -
+                    datetime.timedelta(days=oldKeyInactivationPeriod)).date()
+deletionDate = (datetime.datetime.now() -
+                datetime.timedelta(days=oldKeyDeletionPeriod)).date()
 
 # Format for lines in credentials.txt
 akidLineFormat = 'aws_access_key_id = {}'
@@ -41,21 +44,23 @@ iam = boto3.client('iam')
 sm = boto3.client('secretsmanager')
 
 # SNS Client
-sns = boto3.client('sns')
+sns_client = boto3.client('sns')
+
+sts_client = boto3.client('sts')
 
 
-# Main method for the lambda function
 def lambda_handler(event, context):
     users = iam.list_users()
     response = {}
 
     for user in users['Users']:
-        process_user(user, response, context)
+        process_user(user, response)
 
     # Build a response for debugging - doesn't change actual work done, just gives output for testing in Lambda console
     # response = build_response(results)
     response['RotationDate'] = rotationDate.__str__()
     return response
+
 
 def get_message(user_name, context):
     """Format SNS Message Function"""
@@ -68,16 +73,18 @@ def get_message(user_name, context):
         context.invoked_function_arn
     return message
 
+
 def send_message(message):
     """Send SNS Publish Function."""
     try:
         response = sns_client.publish(
             TopicArn=sns_arn,
-            Message= message,
+            Message=message,
             Subject="New AWS IAM Access Key Pair Created."
         )
     except ClientError as error:
         print(error)
+
 
 def get_account_id():
     """
@@ -92,7 +99,8 @@ def get_account_id():
 
     return account_id
 
-def process_user(user, response, context):
+
+def process_user(user, response):
     """Rotate access keys for a user.
 
     Inactive keys will be deleted
@@ -142,9 +150,10 @@ def process_user(user, response, context):
         else:
             # Both keys older than rotation date. Delete oldest and create new
             key_to_delete = oldest_key['AccessKeyId']
-            iam.delete_access_key(UserName=user_name, AccessKeyId=key_to_delete)
+            iam.delete_access_key(UserName=user_name,
+                                  AccessKeyId=key_to_delete)
             response[user_name]["Deleted Old Key"] = key_to_delete
-            create_access_key(user, response, context)
+            create_access_key(user, response)
             response[user_name]["Action"] = "Key rotated."
     elif num_active == 1 and num_inactive == 1:
         # One active and one inactive. Handle inactive key according to inactivation/deletion dates
@@ -155,13 +164,14 @@ def process_user(user, response, context):
         if classification == "New":
             response[user_name]["Action"] = "No key rotation required."
         else:
-            create_access_key(user, response, context)
+            create_access_key(user, response)
             response[user_name]["Action"] = "Key rotated."
     elif num_active == 0 and num_inactive > 0:
         # If no active keys, delete all inactive keys
         response[user_name]["Deleted Inactive Keys"] = []
         for key_to_delete in inactive_keys:
-            iam.delete_access_key(UserName=user_name, AccessKeyId=key_to_delete)
+            iam.delete_access_key(UserName=user_name,
+                                  AccessKeyId=key_to_delete)
             response[user_name]["Deleted Inactive Keys"].append(key_to_delete)
 
 
@@ -181,7 +191,8 @@ def handle_oldest_key(user_name, response, oldest_key):
 
     if classification == "Inactivate":
         key_to_inactivate = oldest_key['AccessKeyId']
-        iam.update_access_key(UserName=user_name, AccessKeyId=key_to_inactivate, Status='Inactive')
+        iam.update_access_key(UserName=user_name,
+                              AccessKeyId=key_to_inactivate, Status='Inactive')
         response[user_name]["Inactivated Old Key"] = key_to_inactivate
     elif classification == "Delete":
         key_to_delete = oldest_key['AccessKeyId']
@@ -189,7 +200,7 @@ def handle_oldest_key(user_name, response, oldest_key):
         response[user_name]["Deleted Old Key"] = key_to_delete
 
 
-def create_access_key(user, response, context):
+def create_access_key(user, response):
     user_name = user['UserName']
     secret_name = secretNameFormat.format(user_name)
 
@@ -198,11 +209,10 @@ def create_access_key(user, response, context):
     response[user_name]["Created Access Key"] = new_access_key['AccessKey']['AccessKeyId']
     response[user_name]["ASM Secret Name"] = secret_name
 
-    message = get_message(user_name, context)
-    send_message(message)
-
-    akid_line = akidLineFormat.format(new_access_key['AccessKey']['AccessKeyId'])
-    secret_line = secretLineFormat.format(new_access_key['AccessKey']['SecretAccessKey'])
+    akid_line = akidLineFormat.format(
+        new_access_key['AccessKey']['AccessKeyId'])
+    secret_line = secretLineFormat.format(
+        new_access_key['AccessKey']['SecretAccessKey'])
     cred_file_body = '{}\n{}'.format(akid_line, secret_line)
 
     # Create new secret, or store in existing
@@ -217,6 +227,7 @@ def create_access_key(user, response, context):
             raise e  # Go Bonk
 
     if create_secret:
-        sm.create_secret(Name=secret_name, Description='Auto-created secret', SecretString=cred_file_body)
+        sm.create_secret(
+            Name=secret_name, Description='Auto-created secret', SecretString=cred_file_body)
     else:
         sm.put_secret_value(SecretId=secret_name, SecretString=cred_file_body)
