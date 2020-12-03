@@ -19,8 +19,7 @@ b.	Note: There is about a 24 hour wait for approval
 a.	This is the email that will be in the ‘Sender’ section of the email sent to your end users.
 3. The AWS resources needed for this tool will deploy with the main CloudFormation template.
 4. Once the template is fully deployed, you will need to upload the following CSV files into the new S3 bucket created for importing into DynamoDB. By uploading the file, it will kick off the import script.<br/>
-a.	Commercial Account: accountemailmapping-commercial.csv 
-b.	GovCloud Account: accountemailmapping-govcloud.csv
+a.	csv-to-s3-account-emails.csv
 5. You can validate import was successful by going to:<br/>
 a.	https://console.aws.amazon.com/dynamodb/<br/>
 b.	‘Tables’ on the left side menu<br/>
@@ -32,22 +31,23 @@ a.	 /aws/lambda/Direct-to-End-User-Emailing-Tool
 8.	All config rules are setup to send SNS notifications to this Lambda for processing and emailing to end users.
 
 ### Remedation Setup:
-1. Log into the AWS Management Console, and select S3 from the Services menu. 
-2. Choose a bucket, and upload the project zip files (Make sure the bucket allows all accounts in your OUs to perform s3:GetObject*.)
-3. Still in the console, choose CloudFormation from the Services menu.
-4. In the left-hand pane, choose StackSets. (If you’ve never created a CloudFormation stack before, choose Get Started.)
-5. Click on Create StackSet.
-6. Choose Upload a template file.
-7. Click on Choose file and select the file named AccessKeysAutoRotateCFN.yml.
-8. Click Next. 
-9. Give the StackSet a name. I used SecurityFindingsRemediationStackSet. 
-10. Enter the S3 Bucket where you stored the zip file (ex: AccessKeyRotationLambdaFunction.zip).
-11. Click Next. 
-12. For Permissions, select Self services permissions and select the AWS IAM Role AWSCloudFormationStackSetAdministrativeRole. (If you created a different Role for this operation, choose this instead.)
-13. Click Next. 
-14. Select Deploy stacks in organizational units and enter all OUs in the text field separated by a comma.
-15. For regions, choose the same region the S3 bucket lives in that you used to upload the zip files..
-16. Leave all other defaults and click Next. 
-17. After reviewing the information, click the checkbox next to I acknowledge that AWS CloudFormation might create IAM resources. 
-18. Click Submit. 
+1. Upload all files to an S3 bucket of your choosing. Make sure all files are at the root of the bucket.
+2. Log into the AWS Management Console, and select S3 from the Services menu. 
+3. Choose a bucket, and upload the project zip files (Make sure the bucket allows all accounts in your OUs to perform s3:GetObject*.)
+4. Still in the console, choose CloudFormation from the Services menu.
+5. In the left-hand pane, choose StackSets. (If you’ve never created a CloudFormation stack before, choose Get Started.)
+6. Click on Create StackSet.
+7. Choose Upload a template file.
+8. Click on Choose file and select the file named iam-key-auto-rotation-and-notifier.yaml.
+9. Click Next. 
+10. Give the StackSet a name. I used SecurityFindingsRemediationStackSet. 
+11. Fill in all parameter fields required.
+12. Click Next. 
+13. For Permissions, select Self services permissions and select the AWS IAM Role AWSCloudFormationStackSetAdministrativeRole. (If you created a different Role for this operation, choose this instead.)
+14. Click Next. 
+15. Select Deploy stacks in organizational units and enter all OUs in the text field separated by a comma.
+16. For regions, choose the same region the S3 bucket lives in that you used to upload the zip files..
+17. Leave all other defaults and click Next. 
+18. After reviewing the information, click the checkbox next to I acknowledge that AWS CloudFormation might create IAM resources. 
+19. Click Submit. 
 
