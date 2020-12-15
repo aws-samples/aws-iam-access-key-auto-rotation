@@ -241,6 +241,7 @@ Resources:
                   - iam:CreateAccessKey
                   - iam:DeleteAccessKey
                   - iam:UpdateAccessKey
+                  - iam:PutUserPolicy
                 Resource: "*"
               - Effect: Allow
                 Action:
