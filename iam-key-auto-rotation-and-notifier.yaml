@@ -242,6 +242,7 @@ Resources:
                   - iam:DeleteAccessKey
                   - iam:UpdateAccessKey
                   - iam:PutUserPolicy
+                  - iam:GetUserPolicy
                 Resource: "*"
               - Effect: Allow
                 Action:
@@ -253,6 +254,7 @@ Resources:
                   - secretsmanager:PutResourcePolicy
                   - secretsmanager:DescribeSecret
                   - secretsmanager:CreateSecret
+                  - secretsmanager:GetResourcePolicy
                 Resource:
                   - !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*"
 
@@ -315,29 +317,3 @@ Resources:
             Resource: "*"
       Topics:
         - !Ref RotationSNSTopic
-
-  RotationCloudWatchEventSNSTrigger:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: CloudWatch Event to trigger SNS notification for S3 Public Access settings
-      EventPattern:
-        source:
-          - "aws.config"
-        detail-type:
-          - "Config Rules Compliance Change: S3 Public Access"
-        detail:
-          messageType:
-            - "ComplianceChangeNotification"
-          configRuleName:
-            - "S3_ACCOUNT_LEVEL_PUBLIC_ACCESS_BLOCKS"
-            - "S3_BUCKET_LOGGING_ENABLED"
-            - "S3_BUCKET_PUBLIC_READ_PROHIBITED"
-            - "S3_BUCKET_PUBLIC_WRITE_PROHIBITED"
-            - "S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED"
-          newEvaluationResult:
-            complianceType:
-              - "NON_COMPLIANT"
-      State: ENABLED
-      Targets:
-        - Arn: !Ref RotationSNSTopic
-          Id: AccessKeyRotationSNSNotification
