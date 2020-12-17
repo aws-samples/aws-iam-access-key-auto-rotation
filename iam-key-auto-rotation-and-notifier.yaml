@@ -317,3 +317,23 @@ Resources:
             Resource: "*"
       Topics:
         - !Ref RotationSNSTopic
+
+  RotationCloudWatchEventSNSTrigger:
+    Type: AWS::Events::Rule
+    Condition: EnableRuleIAMAccessKeyAutoRotation
+    Properties:
+      Description: CloudWatch Event to trigger SNS notification for IAM Access Key generation
+      EventPattern:
+        source:
+          - "aws.iam"
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "iam.amazonaws.com"
+          eventName:
+            - "CreateAccessKey"
+      State: ENABLED
+      Targets:
+        - Arn: !Ref RotationSNSTopic
+          Id: AccessKeyRotationSNSNotification
