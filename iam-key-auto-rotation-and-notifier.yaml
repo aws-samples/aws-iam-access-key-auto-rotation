@@ -252,6 +252,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - secretsmanager:PutResourcePolicy
+                  - secretsmanager:PutSecretValue
                   - secretsmanager:DescribeSecret
                   - secretsmanager:CreateSecret
                   - secretsmanager:GetResourcePolicy
@@ -320,7 +321,6 @@ Resources:
 
   RotationCloudWatchEventSNSTrigger:
     Type: AWS::Events::Rule
-    Condition: EnableRuleIAMAccessKeyAutoRotation
     Properties:
       Description: CloudWatch Event to trigger SNS notification for IAM Access Key generation
       EventPattern:
@@ -336,4 +336,4 @@ Resources:
       State: ENABLED
       Targets:
         - Arn: !Ref RotationSNSTopic
-          Id: AccessKeyRotationSNSNotification
+          Id: "AccessKeyRotationSNSNotification"
