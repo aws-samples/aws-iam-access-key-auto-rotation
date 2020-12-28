@@ -31,7 +31,7 @@ a.	 /aws/lambda/Direct-to-End-User-Emailing-Tool
 8.	All config rules are setup to send SNS notifications to this Lambda for processing and emailing to end users.
 
 ### Remedation Setup:
-1. Upload all files to an S3 bucket of your choosing. Make sure all files are at the root of the bucket.
+1. Upload all files to an S3 bucket of your choosing. Make sure all files are stored in the prefix specified. The prefix "iam-rotation" was pre-filled for you.
 2. Log into the AWS Management Console, and select S3 from the Services menu. 
 3. Choose a bucket, and upload the project zip files (Make sure the bucket allows all accounts in your OUs to perform s3:GetObject*.)
 4. Still in the console, choose CloudFormation from the Services menu.
