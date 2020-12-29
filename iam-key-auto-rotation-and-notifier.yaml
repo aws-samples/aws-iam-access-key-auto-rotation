@@ -192,6 +192,12 @@ Resources:
                 Action:
                   - ses:SendEmail
                 Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${S3BucketName}/${S3BucketPrefix}"
+                  - !Sub "arn:aws:s3:::${S3BucketName}/${S3BucketPrefix}/*"
 
   NotifierLambdaFunction:
     Type: AWS::Lambda::Function
@@ -210,7 +216,7 @@ Resources:
           ADMIN_EMAIL: !Ref AdminEmailAddress
           DYNAMODB_TABLE_NAME: !Ref EmailTableName
           S3_BUCKET_NAME: !Ref S3BucketName
-          S3_BUCKET_PREFIX: !Sub ${S3BucketPrefix}/templates
+          S3_BUCKET_PREFIX: !Sub ${S3BucketPrefix}
 
   # IAM KEY ROTATION RESOURCES
   RotationLambdaFunctionExecutionRole:
