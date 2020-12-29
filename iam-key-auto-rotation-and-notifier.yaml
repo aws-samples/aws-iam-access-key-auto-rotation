@@ -180,6 +180,10 @@ Resources:
                   - s3:GetObject
                 Resource:
                   - !GetAtt CsvS3Bucket.Arn
+                  - !Join
+                    - ''
+                    - - !GetAtt CsvS3Bucket.Arn
+                      - /*
               - Effect: Allow
                 Action:
                   - dynamodb:GetItem
