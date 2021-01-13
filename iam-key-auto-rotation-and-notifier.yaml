@@ -291,7 +291,6 @@ Resources:
           RotationPeriod: 90
           InactivePeriod: 100
           RetentionPeriod: 110
-          sns_arn: !Ref RotationSNSTopic
       Code:
         S3Bucket: !Ref S3BucketName
         S3Key: !Sub ${S3BucketPrefix}/access_key_auto_rotation_0.83.0.zip
