@@ -1,0 +1,22 @@
+{
+  "Records": [
+    {
+      "EventSource": "aws:sns",
+      "EventVersion": "1.0",
+      "EventSubscriptionArn": "arn:aws:sns:us-east-1:ACCOUNT_ID:SNSNotificationForNewAccessKeyCreation:TOPIC_ID",
+      "Sns": {
+        "Type": "Notification",
+        "MessageId": "ec42a859-4e1d-5167-a5fa-f03c37638edc",
+        "TopicArn": "arn:aws:sns:us-east-1:ACCOUNT_ID:SNSNotificationForNewAccessKeyCreation",
+        "Subject": null,
+        "Message": "{\"version\":\"0\",\"id\":\"cf6d2e22-58c7-f02a-4601-cb9fcd2ff6c9\",\"detail-type\":\"AWS API Call via CloudTrail\",\"source\":\"aws.iam\",\"account\":\"ACCOUNT_ID\",\"time\":\"2020-12-29T18:36:44Z\",\"region\":\"us-east-1\",\"resources\":[],\"detail\":{\"eventVersion\":\"1.08\",\"userIdentity\":{\"type\":\"AssumedRole\",\"principalId\":\"AROA5EPR6DZEXAMPLE:IAM-Access-Key-Rotation-LambdaFunctionName\",\"arn\":\"arn:aws:sts::ACCOUNT_ID:assumed-role/iam-auto-rotation-setup-RotationLambdaFunctionExec-19YY7YVGOBNQD/IAM-Access-Key-Rotation-LambdaFunctionName\",\"accountId\":\"ACCOUNT_ID\",\"accessKeyId\":\"ASIA5EPR6DZEXAMPLE\",\"sessionContext\":{\"sessionIssuer\":{\"type\":\"Role\",\"principalId\":\"AROA5EPR6DZEXAMPLE\",\"arn\":\"arn:aws:iam::ACCOUNT_ID:role/iam-auto-rotation-setup-RotationLambdaFunctionExec-19YY7YVGOBNQD\",\"accountId\":\"ACCOUNT_ID\",\"userName\":\"iam-auto-rotation-setup-RotationLambdaFunctionExec-19YY7YVGOBNQD\"},\"webIdFederationData\":{},\"attributes\":{\"mfaAuthenticated\":\"false\",\"creationDate\":\"2020-12-29T18:36:33Z\"}}},\"eventTime\":\"2020-12-29T18:36:44Z\",\"eventSource\":\"iam.amazonaws.com\",\"eventName\":\"CreateAccessKey\",\"awsRegion\":\"us-east-1\",\"sourceIPAddress\":\"3.236.213.195\",\"userAgent\":\"Boto3/1.15.16 Python/3.8.6 Linux/4.14.203-112.332.amzn2.x86_64 exec-env/AWS_Lambda_python3.8 Botocore/1.18.16\",\"requestParameters\":{\"userName\":\"iam_user\"},\"responseElements\":{\"accessKey\":{\"userName\":\"iam_user\",\"accessKeyId\":\"AKIA5EPR6DZEXAMPLE\",\"status\":\"Active\",\"createDate\":\"Dec 29, 2020 6:36:44 PM\"}},\"requestID\":\"b46d4bee-7fcc-4bb8-ad44-9eeb9858f89e\",\"eventID\":\"2ea70b3d-16dc-43f4-8aeb-db8dce9404ba\",\"readOnly\":false,\"eventType\":\"AwsApiCall\",\"managementEvent\":true,\"eventCategory\":\"Management\"}}",
+        "Timestamp": "2020-12-29T18:36:46.218Z",
+        "SignatureVersion": "1",
+        "Signature": "edKQwYSVARLwY9F4qDugwKeTzQKwuauL9RwdonOhp3uL0sl/eOzZTSaYIrFBxmHkgn2ROCADPArIPYFQH+eSJ6TkznkjkD2h2COAGHFYPPfanlEgmj3uR//lZ9Ketea+51uc5gDFTyLqVCP55iXrWrK1salsINJXMjp7GVupK1DTgkRVeNIHugLU+K+VCfaQhbto4DQp0LletLFICYBBbo/zQ84xQucCS9geiDnPFkMZWQmvd5qpY9a0v2KZ7pz9+cM8cPOAWAQ3QhoCol4xBMTxIcriKrQvLEnXmLdoy0aqk5bqSPlT4hpfY4DQCDy46nKB0e1/fYa/ScZwon8c3g==",
+        "SigningCertUrl": "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-010a507c1833636cd94bdb98bd93083a.pem",
+        "UnsubscribeUrl": "https://sns.us-east-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-east-1:ACCOUNT_ID:SNSNotificationForNewAccessKeyCreation:2b1a88bc-fc1f-43c5-b881-2fbc6806f00a",
+        "MessageAttributes": {}
+      }
+    }
+  ]
+}
