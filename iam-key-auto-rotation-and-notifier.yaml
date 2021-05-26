@@ -158,6 +158,12 @@ Resources:
     Properties:
       BucketName: !Ref CSVBucketName
       AccessControl: BucketOwnerFullControl
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      VersioningConfiguration:
+        Status: Enabled
       NotificationConfiguration:
         LambdaConfigurations:
           - Event: "s3:ObjectCreated:*"
