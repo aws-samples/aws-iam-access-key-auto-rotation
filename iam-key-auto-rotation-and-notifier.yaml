@@ -14,6 +14,7 @@ Metadata:
         Parameters:
           - S3BucketName
           - S3BucketPrefix
+          - KMSKeyID
       - Label:
           default: Configure Notifier Tool
         Parameters:
@@ -28,6 +29,8 @@ Metadata:
         default: CloudFormation S3 Bucket Name
       S3BucketPrefix:
         default: CloudFormation S3 Bucket Prefix
+      KMSKeyID:
+        default: KMS Key ID for SNS Encryption
 
       # Notifier Settings
       CSVBucketName:
@@ -49,6 +52,10 @@ Parameters:
     Description: The prefix or directory where resources will be stored.
     Type: String
     Default: "iam-rotation"
+
+  KMSKeyID:
+    Description: The KMS Key ID you wish to use for encryption of your SNS Topic. (If using a custom Master Key, you must have permissions to utilize this key.)
+    Type: String
 
   CSVBucketName:
     Description: Name of a NEW S3 bucket that you will upload your CSV of email accounts.
@@ -273,6 +280,7 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: SNSNotificationForNewAccessKeyCreation
+      KmsMasterKeyId: !Ref KMSKeyID
       Subscription:
         - Endpoint: !GetAtt NotifierLambdaFunction.Arn
           Protocol: lambda
