@@ -1,0 +1,126 @@
+# (c) 2021 Amazon Web Services, Inc. or its affiliates. All Rights Reserved. This AWS Content
+# is provided subject to the terms of the AWS Customer Agreement available at
+# https://aws.amazon.com/agreement/ or other written agreement between Customer
+# and Amazon Web Services, Inc.
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "AWS CloudFormation template that deploys the IAM Assume Role that will be used by the ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template."
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: ASA IAM Role Configurations
+        Parameters:
+          - IAMRoleName
+          - ExecutionRoleName
+          - PrimaryAccountID
+          - IAMExemptionGroup
+          - AWSOrgID
+    ParameterLabels:
+      IAMRoleName:
+        default: Assumed IAM Role Name
+      ExecutionRoleName:
+        default: IAM Execution Role Name
+      PrimaryAccountID:
+        default: Primary AWS Account ID
+      IAMExemptionGroup:
+        default: IAM Exemption Group
+      AWSOrgID:
+        default: AWS Organization ID
+Parameters:
+  IAMRoleName:
+    Description: "Enter the name of IAM Role that the main ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template will assume."
+    Type: String
+    Default: "asa-iam-key-rotation-lambda-assumed-role"
+  ExecutionRoleName:
+    Description: "Enter the name of IAM Execution Role that will assume the sub-account role for Lambda Execution."
+    Type: String
+    Default: "asa-iam-key-rotation-lambda-execution-role"
+  PrimaryAccountID:
+    Description: "Enter the primary AWS Account ID that will you will be deploying the ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template to."
+    Type: String
+    Default: ""
+  IAMExemptionGroup:
+    Description: "Manage IAM Key Rotation exemptions via an IAM Group. Enter the IAM Group name being used to facilitate IAM accounts excluded from auto-key rotation."
+    Type: String
+    Default: IAMKeyRotationExemptionGroup
+  AWSOrgID:
+    Description: "Enter your AWS Organization ID, this will be used to restricted execution permissions to only approved AWS Accounts within your AWS Organization."
+    Type: String
+    Default: ""
+
+Resources:
+  ##################################################################
+  # ASA IAM Role that will be assumed by the ASA IAM Key Rotation 
+  #  Function.
+  ##################################################################
+  ASAIAMAssumedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref IAMRoleName
+      Description: !Sub "IAM Assume Role used by ${PrimaryAccountID}'s ASA-IAM-Access-Key-Rotation-Function Lambda. This role is used to inspect and rotate IAM Keys that are violating the company's key rotation policy."
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS:
+              - !Sub ${PrimaryAccountID}            
+          Action: sts:AssumeRole
+      Policies:
+          - PolicyName: AllowRotationFunctionPermissions
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - iam:List*
+                    - iam:CreatePolicy
+                    - iam:CreateAccessKey
+                    - iam:DeleteAccessKey
+                    - iam:UpdateAccessKey
+                    - iam:PutUserPolicy
+                    - iam:GetUserPolicy
+                    - iam:GetAccessKeyLastUsed
+                    - iam:GetUser
+                  Resource: "*"
+                - Effect: Allow
+                  Action:
+                    - iam:AttachUserPolicy
+                  Resource:
+                    - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:user/*"
+                - Effect: Allow
+                  Action:
+                    - secretsmanager:PutResourcePolicy
+                    - secretsmanager:PutSecretValue
+                    - secretsmanager:DescribeSecret
+                    - secretsmanager:CreateSecret
+                    - secretsmanager:GetResourcePolicy
+                  Resource:
+                    - !Sub "arn:${AWS::Partition}:secretsmanager:*:${AWS::AccountId}:secret:*"
+                - Effect: Allow
+                  Action:
+                    - iam:GetGroup
+                  Resource:
+                    - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:group/${IAMExemptionGroup}"
+                - Effect: Allow
+                  Action:
+                    - sts:AssumeRole
+                  Resource: !Sub arn:${AWS::Partition}:iam::${PrimaryAccountID}:role/${ExecutionRoleName}
+                  Condition:
+                    StringEquals:
+                      aws:PrincipalOrgID: !Ref AWSOrgID
+      Path: /
+
+  ##################################################################
+  # ASA IAM Group that will be used to manage account exemptions
+  ##################################################################
+  ASAIAMExemptionsGroup:
+    Type: AWS::IAM::Group
+    Properties: 
+      GroupName: !Ref IAMExemptionGroup
+
+
+
+      

@@ -1,0 +1,352 @@
+# (c) 2021 Amazon Web Services, Inc. or its affiliates. All Rights Reserved. This AWS Content
+# is provided subject to the terms of the AWS Customer Agreement available at
+# https://aws.amazon.com/agreement/ or other written agreement between Customer
+# and Amazon Web Services, Inc.
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "AWS CloudFormation template that deploys the ASA Notifier Module and the ASA IAM Access Keys Auto-Rotation Function."
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Deployment Configurations
+        Parameters:
+          - S3BucketName
+          - S3BucketPrefix
+          - IAMRoleName
+          - ExecutionRoleName
+          - DryRunFlag
+      - Label:
+          default: Configure ASA Notifier Module
+        Parameters:
+          - AdminEmailAddress
+          - AWSOrgID
+          - EmailTemplateAudit
+          - EmailTemplateEnforce
+      - Label:
+          default: Configure ASA IAM Key Rotation Exemption Group
+        Parameters:
+          - IAMExemptionGroup
+      - Label:
+          default: Configure ASA IAM Key Rotation Parameters
+        Parameters:
+          - RotationPeriod
+          - InactiveBuffer
+          - InactivePeriod
+          - RecoveryGracePeriod
+    ParameterLabels:
+      # Deployment Configuration
+      S3BucketName:
+        default: CloudFormation S3 Bucket Name
+      S3BucketPrefix:
+        default: CloudFormation S3 Bucket Prefix
+      IAMRoleName:
+        default: Assumed IAM Role Name
+      ExecutionRoleName:
+        default: IAM Execution Role Name
+      DryRunFlag:
+        default: 'Dry Run Flag (Audit Mode)'
+      # Notifier Settings
+      AdminEmailAddress:
+        default: Admin Email Address
+      AWSOrgID:
+        default: AWS Organization ID
+      EmailTemplateEnforce:
+        default: 'Email Template File Name [Enforce Mode]'
+      EmailTemplateAudit:
+        default: 'Email Template File Name [Audit Mode]'
+      # IAM Rotation Settings
+      IAMExemptionGroup:
+        default: IAM Exemption Group
+      #Date/Time Thresholds
+      InactiveBuffer:
+        default: Inactive Buffer
+      RotationPeriod:
+        default: Rotation Period
+      InactivePeriod:
+        default: Inactive Period
+      RecoveryGracePeriod:
+        default: Recovery Grace Period
+Parameters:
+  S3BucketName:
+    Description: "S3 Bucket Name where code is located."
+    Type: String
+    Default: ""
+  S3BucketPrefix:
+    Description: "The prefix or directory where resources will be stored."
+    Type: String
+    Default: "asa/asa-iam-rotation"
+  AdminEmailAddress:
+    Description: "Email address that will be used in the 'sent from' section of the email."
+    Type: String
+    Default: ""
+  AWSOrgID:
+    Description: "Enter your AWS Organization ID, this will be used to restricted execution permissions to only approved AWS Accounts within your AWS Organization."
+    Type: String
+    Default: ""
+  IAMExemptionGroup:
+    Description: "Manage IAM Key Rotation exemptions via an IAM Group. Enter the IAM Group name being used to facilitate IAM accounts excluded from auto-key rotation."
+    Type: String
+    Default: IAMKeyRotationExemptionGroup
+  IAMRoleName:
+    Description: "Enter the name of IAM Role that the main ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template will assume."
+    Type: String
+    Default: "asa-iam-key-rotation-lambda-assumed-role"
+  ExecutionRoleName:
+    Description: "Enter the name of IAM Execution Role that will assume the sub-account role for Lambda Execution."
+    Type: String
+    Default: "asa-iam-key-rotation-lambda-execution-role"
+  EmailTemplateEnforce:
+    Description: "Enter the file name of the email html template to be sent out by the Notifier Module for Enforce Mode. Note: Must be located in the 'S3 Bucket Prefix/Template/template_name.html' folder"
+    Type: String
+    Default: "iam-auto-key-rotation-enforcement.html"
+  EmailTemplateAudit:
+    Description: "Enter the file name of the email html template to be sent out by the Notifier Module for Audit Mode. Note: Must be located in the 'S3 Bucket Prefix/Template/template_name.html' folder"
+    Type: String
+    Default: "iam-auto-key-rotation-enforcement.html"
+  RotationPeriod:
+    Description: "The number of days after which a key should be rotated (rotating from active to inactive)."
+    Type: Number
+    Default: 90
+  InactivePeriod:
+    Description: "The number of days after which to inactivate keys that had been rotated (Note: This must be greater than RotationPeriod)."
+    Type: Number
+    Default: 100
+  InactiveBuffer:
+    Description: "The grace period between rotation and deactivation of a key."
+    Type: Number
+    Default: 10
+  RecoveryGracePeriod:
+    Description: "Recovery grace period between deactivation and deletion."
+    Type: Number
+    Default: 10
+  DryRunFlag:
+    Description: "Enables/Disables key rotation functionality. 'True' only sends notifications to end users (Audit Mode). 'False' preforms key rotation and sends notifications to end users (Remediation Mode)."
+    Type: String
+    Default: "True"
+    AllowedValues:
+      - "True"
+      - "False"
+Resources:
+  ##################################################################
+  # [ASA Notifier Module] Lambda Role & Function
+  ##################################################################
+  NotifierFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowExecutionPermissionsOnFunction
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: AllowNotiferToGetEmailTemplate
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: AllowFunctionAccessToEmailTemplates
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${S3BucketName}/${S3BucketPrefix}/Template/*' # Only allow access to Email Template Bucket
+                Condition:
+                  StringEquals:
+                    aws:PrincipalOrgID: !Ref AWSOrgID
+              - Sid: AllowFunctionToSendEmail
+                Effect: Allow
+                Action:
+                  - ses:SendEmail
+                Resource: !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*' # Allow role to send email on behalf of admin email identity
+  NotifierLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Function that received SNS events from config rules and emails end users who own the account id of the resource violation.
+      FunctionName: ASA-Notifier
+      Handler: main.lambda_handler
+      Runtime: python3.8
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Sub ${S3BucketPrefix}/Lambda/notifier.zip
+      Role: !GetAtt NotifierFunctionExecutionRole.Arn
+      Timeout: 300
+      Environment:
+        Variables:
+          ADMIN_EMAIL: !Ref AdminEmailAddress
+          S3_BUCKET_NAME: !Ref S3BucketName
+          S3_BUCKET_PREFIX: !Ref S3BucketPrefix
+
+  ##################################################################
+  # [AWS IAM Access Keys Rotation Module] Lambda Role & Function
+  ##################################################################
+  RotationLambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    DependsOn: NotifierLambdaFunction
+    Properties:
+      RoleName: !Ref ExecutionRoleName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowExecutionPermissionsOnFunction
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: AllowRotationFunctionPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource: !Sub 'arn:${AWS::Partition}:iam::*:role/${IAMRoleName}' # All accounts in Org
+                Condition:
+                  StringEquals:
+                    aws:PrincipalOrgID: !Ref AWSOrgID
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt NotifierLambdaFunction.Arn
+  AccessKeyRotateLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: ASA Function to rotate IAM Access Keys on specified schedule
+      FunctionName: ASA-IAM-Access-Key-Rotation-Function
+      Handler: main.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt RotationLambdaFunctionExecutionRole.Arn
+      Timeout: 400
+      Environment:
+        Variables:
+          DryRunFlag: !Ref DryRunFlag
+          RotationPeriod: !Ref RotationPeriod
+          InactivePeriod: !Ref InactivePeriod
+          InactiveBuffer: !Ref InactiveBuffer
+          RecoveryGracePeriod: !Ref RecoveryGracePeriod
+          IAMExemptionGroup: !Ref IAMExemptionGroup
+          IAMAssumedRoleName: !Ref IAMRoleName
+          RoleSessionName: 'ASA-IAM-Access-Key-Rotation-Function'
+          Partition: !Sub ${AWS::Partition}
+          NotifierArn: !GetAtt NotifierLambdaFunction.Arn
+          EmailTemplateEnforce: !Ref EmailTemplateEnforce
+          EmailTemplateAudit: !Ref EmailTemplateAudit
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Sub ${S3BucketPrefix}/Lambda/access_key_auto_rotation.zip
+
+  ##################################################################
+  # Permissions to allow RotationLambdaFunction to Invoke Notifier
+  #    Lambda Function 
+  ##################################################################
+  RotationAccessKeyRotateLambdaInvokeLambdaPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref NotifierLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: !Sub ${AWS::AccountId}
+      SourceArn: !Sub 'arn:${AWS::Partition}:sts::${AWS::AccountId}:assumed-role/${ExecutionRoleName}/${AccountInventoryLambdaFunction}'
+
+  ##################################################################
+  # [AWS Account & Email Inventory Module] Lambda Role & Function
+  ##################################################################
+  AccountInventoryFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowExecutionPermissionsOnFunction
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: AllowAWSOrgAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - organizations:ListAccounts
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:PrincipalOrgID: !Ref AWSOrgID
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt AccessKeyRotateLambdaFunction.Arn
+  AccountInventoryLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: "Function that calls the DescribeAccount & ListAccounts on AWS Organizations to collect all AWS Account IDs and corresponding Emails."
+      FunctionName: ASA-Account-Inventory
+      Handler: account_inventory.lambda_handler
+      Runtime: python3.8
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Sub ${S3BucketPrefix}/Lambda/account_inventory.zip
+      Role: !GetAtt AccountInventoryFunctionExecutionRole.Arn
+      Timeout: 300
+      Environment:
+        Variables:
+            LambdaRotationFunction: !Ref AccessKeyRotateLambdaFunction
+  AccountInventoryTriggerLambdaPermissions:
+    Type: AWS::Lambda::Permission
+    DependsOn: AccountInventoryLambdaFunction
+    Properties:
+      FunctionName: !Ref AccessKeyRotateLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: !Sub ${AWS::AccountId}
+      SourceArn: !Sub 'arn:${AWS::Partition}:sts::${AWS::AccountId}:assumed-role/${ExecutionRoleName}/${AccountInventoryLambdaFunction}'
+
+  ##################################################################
+  # CloudWatch event trigger to run AccountInventoryFunction 
+  #   Function on a schedule. rate(24 hours) = Once a Day
+  ##################################################################
+  RotationCloudWatchEventLambdaTrigger:
+    Type: AWS::Events::Rule
+    DependsOn: AccountInventoryLambdaFunction
+    Properties:
+      Description: CloudWatch Event to trigger Access Key auto-rotation Lambda Function daily
+      ScheduleExpression: rate(24 hours)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt AccountInventoryLambdaFunction.Arn
+          Id: AccountInventoryLambdaFunction
+  RotationCloudWatchEventLambdaTriggerLambdaPermissions:
+    Type: AWS::Lambda::Permission
+    DependsOn: RotationCloudWatchEventLambdaTrigger
+    Properties:
+      FunctionName: !Ref AccountInventoryLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt RotationCloudWatchEventLambdaTrigger.Arn
+
+##################################################################
+# Output section
+##################################################################
+Outputs:
+  oAccountInventoryLambdaFunction:
+    Description: "Step 1 - Lambda that dynamically collects all AWS Account IDs in an AWS organization."
+    Value: !GetAtt AccountInventoryLambdaFunction.Arn
+  oAccessKeyRotateLambdaFunction:
+    Description: "Step 2 - Lambda that dynamically audits and rotates old IAM access keys."
+    Value: !GetAtt AccessKeyRotateLambdaFunction.Arn
+  oNotifierLambdaFunction:
+    Description: "Step 3 - Lambda that sends an email notification if a key is rotated."
+    Value: !GetAtt NotifierLambdaFunction.Arn
