@@ -1,5 +1,5 @@
 ## AWS IAM Key Rotation
-This set of CloudFormation templates and Python scripts will set up an auto-rotation function that will automatically rotate your AWS IAM User Access Keys every 90 days. At 100 days it will then disable the old Access Keys. And finally at 110 days it will delete the old Access Keys. It will also set up a secret inside AWS Secrets Manager to store the new Access Keys, with a resource policy that permits only the AWS IAM User access to them. There is also automation to send emails with a custome email template via SES that will alert account owners when rotation occurs. 
+This set of CloudFormation templates and Python scripts will set up an auto-rotation function that will automatically rotate your AWS IAM User Access Keys every 90 days. At 100 days it will then disable the old Access Keys. And finally at 110 days it will delete the old Access Keys. It will also set up a secret inside AWS Secrets Manager to store the new Access Keys, with a resource policy that permits only the AWS IAM User access to them. There is also automation to send emails with a custom email template via SES that will alert account owners when rotation occurs. 
 
 ## Security
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
