@@ -18,3 +18,6 @@ b.	Note: There is about a 24 hour wait for approval
 2. While in Amazon Simple Email Service (SES), verify the senders address or the sender domain that you will use as the email source.<br/>
 a.	This is the email that will be in the ‘Sender’ section of the email sent to your end users.
 3. The AWS resources needed for this tool will deploy with the main CloudFormation template.
+
+**Terraform**
+There are Terraform configurations under the Terraform/ directory that may be used as an alternative to the CloudFormation templates.
