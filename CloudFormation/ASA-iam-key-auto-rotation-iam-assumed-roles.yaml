@@ -1,7 +1,5 @@
-# (c) 2021 Amazon Web Services, Inc. or its affiliates. All Rights Reserved. This AWS Content
-# is provided subject to the terms of the AWS Customer Agreement available at
-# https://aws.amazon.com/agreement/ or other written agreement between Customer
-# and Amazon Web Services, Inc.
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: "AWS CloudFormation template that deploys the IAM Assume Role that will be used by the ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template."
@@ -16,7 +14,6 @@ Metadata:
           - ExecutionRoleName
           - PrimaryAccountID
           - IAMExemptionGroup
-          - AWSOrgID
     ParameterLabels:
       IAMRoleName:
         default: Assumed IAM Role Name
@@ -26,8 +23,6 @@ Metadata:
         default: Primary AWS Account ID
       IAMExemptionGroup:
         default: IAM Exemption Group
-      AWSOrgID:
-        default: AWS Organization ID
 Parameters:
   IAMRoleName:
     Description: "Enter the name of IAM Role that the main ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template will assume."
@@ -45,10 +40,6 @@ Parameters:
     Description: "Manage IAM Key Rotation exemptions via an IAM Group. Enter the IAM Group name being used to facilitate IAM accounts excluded from auto-key rotation."
     Type: String
     Default: IAMKeyRotationExemptionGroup
-  AWSOrgID:
-    Description: "Enter your AWS Organization ID, this will be used to restricted execution permissions to only approved AWS Accounts within your AWS Organization."
-    Type: String
-    Default: ""
 
 Resources:
   ##################################################################
@@ -66,7 +57,7 @@ Resources:
         - Effect: Allow
           Principal:
             AWS:
-              - !Sub ${PrimaryAccountID}            
+              - !Sub arn:${AWS::Partition}:iam::${PrimaryAccountID}:role/${ExecutionRoleName}            
           Action: sts:AssumeRole
       Policies:
           - PolicyName: AllowRotationFunctionPermissions
@@ -97,6 +88,7 @@ Resources:
                     - secretsmanager:DescribeSecret
                     - secretsmanager:CreateSecret
                     - secretsmanager:GetResourcePolicy
+                    - secretsmanager:ReplicateSecretToRegions
                   Resource:
                     - !Sub "arn:${AWS::Partition}:secretsmanager:*:${AWS::AccountId}:secret:*"
                 - Effect: Allow
@@ -104,13 +96,6 @@ Resources:
                     - iam:GetGroup
                   Resource:
                     - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:group/${IAMExemptionGroup}"
-                - Effect: Allow
-                  Action:
-                    - sts:AssumeRole
-                  Resource: !Sub arn:${AWS::Partition}:iam::${PrimaryAccountID}:role/${ExecutionRoleName}
-                  Condition:
-                    StringEquals:
-                      aws:PrincipalOrgID: !Ref AWSOrgID
       Path: /
 
   ##################################################################
@@ -118,7 +103,7 @@ Resources:
   ##################################################################
   ASAIAMExemptionsGroup:
     Type: AWS::IAM::Group
-    Properties: 
+    Properties:
       GroupName: !Ref IAMExemptionGroup
 
 

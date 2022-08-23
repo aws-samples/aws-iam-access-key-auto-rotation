@@ -1,0 +1,204 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+#---------------------------------------------------------------------------
+# Version:  1.0
+# This Template Creates Following Resources if corresponding boolean flag is True
+#
+# 1. SES interface endpoint
+# 2. SSM interface endpoint
+# 3. STS interface endpoint
+# 4. S3 Endpoint  Endpoint
+# 5. Secrets manager interface endpoint
+#
+# The pipeline pushed images to ECR which allows accounts in AWS Org to pull the images
+# CVE scan result is sent via SNS to an email specified, and a Lambda function retags the latest pushed image as 'latest'
+#----------------------------------------------------------------------------
+
+AWSTemplateFormatVersion: 2010-09-09
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Configuration
+        Parameters:
+          - pVpcId
+          - pSubnetId
+          - pVPCCidr
+          - pCreateSESEndpoint
+          - pCreateSSMEndpoint
+          - pCreateSTSEndpoint
+          - pCreateS3GatewayEndpoint
+          - pCreateSecretsManagerEndpoint
+    ParameterLabels:
+      pVpcId:
+        default: VPC ID
+      pSubnetId:
+        default: Subnet Id
+      pVPCCidr:
+        default: CIDR range for VPC
+      pCreateSESEndpoint:
+        default: Create SES  Interface Endpoint ?
+      pCreateSSMEndpoint:
+        default: Create SSM  Interface Endpoint ?
+      pCreateSTSEndpoint:
+        default: Create STS  Interface Endpoint ?
+      pCreateS3GatewayEndpoint:
+        default: Create S3 Gateway Endpoint ?
+      pCreateSecretsManagerEndpoint:
+        default: Create Secrets Manager Interface Endpoint ?
+Parameters:
+  pVpcId:
+    Type: AWS::EC2::VPC::Id
+  pSubnetId:
+    Type: AWS::EC2::Subnet::Id
+  pVPCCidr:
+    Type: String
+    Default: 0.0.0.0/0
+  pCreateSESEndpoint:
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'False'
+    Description: Select True if you want to create SES Interface endoint
+    Type: String
+  pCreateSSMEndpoint:
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'False'
+    Description: Select True if you want to create SSM Interface endoint
+    Type: String
+  pCreateSTSEndpoint:
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'False'
+    Description: Select True if you want to create STS Interface endoint
+    Type: String
+  pCreateS3GatewayEndpoint:
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'False'
+    Description: Select True if you want to create S Gateway endoint
+    Type: String
+  pCreateSecretsManagerEndpoint:
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'False'
+    Description: Select True if you want to create Secrets Manager Interface endoint
+    Type: String
+
+Conditions:
+  createSESEndpoint: !Equals [!Ref 'pCreateSESEndpoint', 'True']
+  createSSMEndpoint: !Equals [!Ref 'pCreateSSMEndpoint', 'True']
+  createSTSEndpoint: !Equals [!Ref 'pCreateSTSEndpoint', 'True']
+  createS3GatewayEndpoint: !Equals [!Ref 'pCreateS3GatewayEndpoint', 'True']
+  createSecretsManagerEndpoint: !Equals [!Ref 'pCreateSecretsManagerEndpoint', 'True']
+  createSG : !Or [!Equals [!Ref 'pCreateSESEndpoint', 'True'], !Equals [!Ref 'pCreateSSMEndpoint', 'True'], !Equals [!Ref 'pCreateSTSEndpoint', 'True'], !Equals [!Ref 'pCreateSecretsManagerEndpoint', 'True']]
+
+Resources:
+
+#------------------------------------------------------------------------------
+#   Create a security group for Docker pipeline creation setup, VPC for SG picked from SSM parameter store. Name picked automatically
+#------------------------------------------------------------------------------
+
+  ASAEndpointsSG:
+    Type: AWS::EC2::SecurityGroup
+    Condition:  createSG
+    Properties:
+      GroupDescription: Security Group for ASA Key Rotation Endpoints
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          CidrIp: !Ref pVPCCidr
+          FromPort: 443
+          ToPort: 443
+        - IpProtocol: tcp
+          CidrIp: !Ref pVPCCidr
+          FromPort: 25
+          ToPort: 25
+        - IpProtocol: tcp
+          CidrIp: !Ref pVPCCidr
+          FromPort: 587
+          ToPort: 587
+        - IpProtocol: tcp
+          CidrIp: !Ref pVPCCidr
+          FromPort: 465
+          ToPort: 465
+        - IpProtocol: tcp
+          CidrIp: !Ref pVPCCidr
+          FromPort: 2587
+          ToPort: 2587
+        - IpProtocol: tcp
+          CidrIp: !Ref pVPCCidr
+          FromPort: 2465
+          ToPort: 2465
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref pVpcId
+
+#------------------------------------------------------------------------------
+#   VPC Endpoints needed for ImageBuilder Access function which scans images for CVE
+#------------------------------------------------------------------------------
+
+  asaSESVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: createSESEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.email-smtp
+      VpcId: !Ref pVpcId
+      SubnetIds:
+        - !Ref pSubnetId
+      SecurityGroupIds:
+        - !Ref ASAEndpointsSG
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: True
+  asaSsmVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: createSSMEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+      VpcId: !Ref pVpcId
+      SubnetIds:
+        - !Ref pSubnetId
+      SecurityGroupIds:
+        - !Ref ASAEndpointsSG
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: True
+  asaSTSVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: createSTSEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.sts
+      VpcId: !Ref pVpcId
+      SubnetIds:
+        - !Ref pSubnetId
+      SecurityGroupIds:
+        - !Ref ASAEndpointsSG
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: True
+  asaS3VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: createS3GatewayEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref pVpcId
+      VpcEndpointType: Gateway
+      PrivateDnsEnabled: False
+  asaSecretsManagerVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: createSecretsManagerEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.secretsmanager
+      VpcId: !Ref pVpcId
+      SubnetIds:
+        - !Ref pSubnetId
+      SecurityGroupIds:
+        - !Ref ASAEndpointsSG
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: True

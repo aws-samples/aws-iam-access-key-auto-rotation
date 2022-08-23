@@ -9,7 +9,7 @@ This library is licensed under the MIT-0 License. See the LICENSE file.
 
 ## Deployment Notes
 **AWS IAM Key Rotation Runbook**
-- Runbook located under asa-iam-rotation/Docs/ASA IAM Key Rotation Runbook (v2) 
+- Runbook located under asa-iam-rotation/Docs/ASA IAM Key Rotation Runbook(v3)
 
 **Simple Email Service (SES) Setup:**
 1. Move the Amazon Simple Email Service (SES) service out of sandbox mode<br/>
