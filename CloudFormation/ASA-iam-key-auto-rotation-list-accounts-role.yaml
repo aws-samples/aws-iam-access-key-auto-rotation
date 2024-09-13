@@ -13,7 +13,8 @@ Metadata:
           - IAMRoleName
           - AccountExecutionRoleName
           - RotationExecutionRoleName
-          - PrimaryAccountID
+          - InfraestructureAccountIDDEV
+          - InfraestructureAccountIDPRD
     ParameterLabels:
       IAMRoleName:
         default: Assumed IAM Role Name
@@ -21,8 +22,10 @@ Metadata:
         default: IAM Execution Role Name for Account Lambda
       RotationExecutionRoleName:
         default: IAM Execution Role Name for rotation Lambda
-      PrimaryAccountID:
-        default: Primary AWS Account ID
+      InfraestructureAccountIDDEV:
+        default: Infraestructure AWS Account ID DEV
+      InfraestructureAccountIDPRD:
+        default: Infraestructure AWS Account ID PRD
 Parameters:
   IAMRoleName:
     Description: "Enter the name of IAM Role that the main ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template will assume."
@@ -36,10 +39,14 @@ Parameters:
     Description: "Enter the name of the Rotation Lambda Execution Role that will assume the role to list accounts."
     Type: String
     Default: "asa-iam-key-rotation-lambda-execution-role"
-  PrimaryAccountID:
-    Description: "Enter the primary/deployment AWS Account ID that will you will be deploying the ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template to."
+  InfraestructureAccountIDDEV:
+    Description: "Enter the Infraestructure/deployment AWS Account ID that will you will be deploying the ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template to."
     Type: String
     Default: ""
+  InfraestructureAccountIDPRD:
+    Description: "Enter the Infraestructure/deployment AWS Account ID that will you will be deploying the ASA-iam-key-auto-rotation-and-notifier-solution.yaml CloudFormation template to."
+    Type: String
+    Default: ""  
 
 Resources:
   ##################################################################
@@ -50,15 +57,17 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Ref IAMRoleName
-      Description: !Sub "IAM Assume Role used by ${PrimaryAccountID}'s ASA-Account-Inventory Lambda. This role is used to list accounts in the Organization."
+      Description: !Sub "IAM Assume Role used by ${InfraestructureAccountIDDEV} and ${InfraestructureAccountIDPRD} ASA-Account-Inventory Lambda. This role is used to list accounts in the Organization."
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
         - Effect: Allow
           Principal:
             AWS:
-              - !Sub arn:${AWS::Partition}:iam::${PrimaryAccountID}:role/${AccountExecutionRoleName}
-              - !Sub arn:${AWS::Partition}:iam::${PrimaryAccountID}:role/${RotationExecutionRoleName}
+              - !Sub arn:${AWS::Partition}:iam::${InfraestructureAccountIDDEV}:role/${AccountExecutionRoleName}
+              - !Sub arn:${AWS::Partition}:iam::${InfraestructureAccountIDDEV}:role/${RotationExecutionRoleName}
+              - !Sub arn:${AWS::Partition}:iam::${InfraestructureAccountIDPRD}:role/${AccountExecutionRoleName}
+              - !Sub arn:${AWS::Partition}:iam::${InfraestructureAccountIDPRD}:role/${RotationExecutionRoleName}
           Action: sts:AssumeRole
       Policies:
           - PolicyName: AllowListOrgAccounts
