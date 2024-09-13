@@ -30,6 +30,7 @@ Metadata:
           - AdminEmailAddress
           - ResourceOwnerTag
           - AWSOrgID
+          - EnvironmentName
           - EmailTemplateAudit
           - EmailTemplateEnforce
           - SMTPUserParamName
@@ -82,6 +83,8 @@ Metadata:
         default: Resource Owner Tag
       AWSOrgID:
         default: AWS Organization ID
+      EnvironmentName:
+        default: AWS Environment name
       EmailTemplateEnforce:
         default: 'Email Template File Name [Enforce Mode]'
       EmailTemplateAudit:
@@ -121,6 +124,10 @@ Parameters:
     Default: ""
   AWSOrgID:
     Description: "Enter your AWS Organization ID, this will be used to restricted execution permissions to only approved AWS Accounts within your AWS Organization."
+    Type: String
+    Default: ""
+  EnvironmentName:
+    Description: "Enter your EnvironmentName, this will be used to restrict execution permissions to only approved AWS functions in your AWS organization."
     Type: String
     Default: ""
   IAMExemptionGroup:
@@ -330,10 +337,18 @@ Resources:
                   - sts:AssumeRole
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:iam::*:role/${IAMRoleName}' # All accounts in Org
-                  - !Sub 'arn:${AWS::Partition}:iam::*:role/${OrgListRole}' # All accounts in Org
                 Condition:
                   StringEquals:
                     aws:PrincipalOrgID: !Ref AWSOrgID
+                    aws:ResourceTag/environment: !Ref EnvironmentName
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:iam::*:role/${OrgListRole}' # All accounts in Org
+                Condition:
+                  StringEquals:
+                    aws:PrincipalOrgID: !Ref AWSOrgID             
               - Effect: Allow
                 Action:
                   - lambda:InvokeFunction
