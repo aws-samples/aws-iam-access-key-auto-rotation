@@ -276,7 +276,7 @@ Resources:
       Description: Function that received SNS events from config rules and emails end users who own the account id of the resource violation.
       FunctionName: ASA-Notifier
       Handler: main.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.13
       Code:
         S3Bucket: !Ref S3BucketName
         S3Key: !Sub ${S3BucketPrefix}/Lambda/notifier.zip
@@ -358,7 +358,7 @@ Resources:
       Description: ASA Function to rotate IAM Access Keys on specified schedule
       FunctionName: ASA-IAM-Access-Key-Rotation-Function
       Handler: main.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.13
       Role: !GetAtt RotationLambdaFunctionExecutionRole.Arn
       Timeout: 400
       VpcConfig:
@@ -443,7 +443,7 @@ Resources:
       Description: "Function that calls the DescribeAccount & ListAccounts on AWS Organizations to collect all AWS Account IDs and corresponding Emails."
       FunctionName: ASA-Account-Inventory
       Handler: main.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.13
       Code:
         S3Bucket: !Ref S3BucketName
         S3Key: !Sub ${S3BucketPrefix}/Lambda/account_inventory.zip
